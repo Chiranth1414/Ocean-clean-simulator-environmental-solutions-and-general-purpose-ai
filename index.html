@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>OilClean Simulator AI 🌊</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Add Transformers.js for offline AI (kept) -->
+<script type="module" src="https://cdn.jsdelivr.net/npm/@xenova/transformers/dist/transformers.min.js"></script>
+<style>
+:root{
+  --bg1:#082032;
+  --bg2:#0b6e99;
+  --accent:#00d4ff;
+  --accent2:#7bffb0;
+  --muted:#cfe8ff;
+
+  /* light theme variables */
+  --light-bg1: #f2fbff;
+  --light-bg2: #d8f6ff;
+  --light-card: rgba(0,0,0,0.03);
+  --light-text: #00131a;
+  --light-input-bg: #ffffff;
+}
+
+/* base */
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  color:#e6f7ff;
+  background: radial-gradient(1200px 600px at 10% 10%, rgba(11,110,153,0.25), transparent),
+              linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
+  padding:20px;
+  scroll-behavior: smooth;
+}
+h1{margin:0;font-size:24px;}
+p.lead{margin:0;color:var(--muted);font-size:14px;}
+.card{background:rgba(255,255,255,0.03);border-radius:12px;padding:16px;margin-bottom:20px;}
+label{display:block;font-size:13px;color:#cfe8ff;margin-bottom:6px;font-weight:600;}
+input[type="number"], input[type="range"], textarea{
+  width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);
+  background: rgba(6,20,30,0.45); color:#e6fbff; outline:none;
+}
+.btn{
+  display:inline-block;padding:10px 14px;border-radius:10px;background:linear-gradient(90deg,var(--accent),var(--accent2));
+  color:#00131a;font-weight:700;border:0;cursor:pointer;margin-top:8px;
+}
+#oilTank{
+  width:100%;
+  height:160px;
+  border-radius:12px;
+  position:relative;
+  overflow:hidden;
+  margin-top:12px;
+  border:2px solid rgba(255,255,255,0.04);
+  background:#ffdb4d;
+  transition: background 1s ease;
+}
+.magnet{
+  width:56px;height:26px;border-radius:6px;
+  position:absolute;left:calc(50% - 28px);top:-18px;
+  background: linear-gradient(180deg,#222,#666);
+  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;
+}
+.oil-drop {
+  position:absolute;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background: rgba(0,0,0,0.35);
+  opacity:0.85;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  animation: dropfloat 3s infinite linear;
+}
+@keyframes dropfloat {
+  0% { transform: translateY(0) translateX(-12px); opacity:1; }
+  50% { transform: translateY(-6px) translateX(6px); opacity:0.9; }
+  100% { transform: translateY(0) translateX(-12px); opacity:1; }
+}
+canvas{background:rgba(255,255,255,0.05);border-radius:10px;margin-top:10px;}
+.ai-solution {
+  margin-top: 10px;
+  padding: 12px;
+  min-height: 60px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  color: #cfe8ff;
+  font-size: 14px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+/* 🌟 Top Navigation Bar */
+.top-nav {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  background: rgba(255,255,255,0.05);
+  padding: 10px;
+  border-radius: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  backdrop-filter: blur(10px);
+}
+.nav-btn {
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  color: #00131a;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.3s;
+}
+.nav-btn:hover {
+  transform: scale(1.05);
+  opacity: 0.9;
+}
+.nav-btn.active { box-shadow: 0 0 10px var(--accent2); }
+
+section { scroll-margin-top: 90px; }
+
+/* Bottom-right controls: AI toggle + Theme toggle */
+.control-fab {
+  position: fixed;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  z-index: 2000;
+}
+#aiToggle {
+  bottom: 74px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  color: #00131a;
+}
+#themeToggle {
+  bottom: 16px;
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+
+/* Chat popup (general AI) */
+/* Chat popup (general AI) */
+#generalAiPopup {
+  position: fixed;
+  right: 16px;
+  bottom: 130px;
+  width: 420px;                /* increased width */
+  max-height: 520px;           /* added */
+  max-width: calc(100% - 40px);
+  background: rgba(6,20,30,0.95);
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 14px;
+  border-radius: 14px;
+  display: none;
+  flex-direction: column;      /* ensure vertical layout */
+  z-index: 3000;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+  overflow: hidden;
+}
+#generalAiPopup h4 {
+  margin: 0 0 10px 0;
+  color: var(--muted);
+  font-size: 15px;
+  text-align: center;
+}
+#generalAiPopup textarea {
+  width: 100%;
+  height: 90px;
+  border-radius: 10px;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(6,20,30,0.6);
+  color: inherit;
+  resize: none;
+}
+#generalAiPopup .chat-output {
+  flex: 1;                     /* makes output fill available space */
+  max-height: 250px;           /* increased */
+  overflow-y: auto;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Light mode adjustments — keep main logic and structure identical */
+.light-mode {
+  color: var(--light-text) !important;
+  background: linear-gradient(180deg,var(--light-bg1) 0%,var(--light-bg2) 100%) !important;
+}
+.light-mode .card { background: var(--light-card) !important; color: var(--light-text); }
+.light-mode input[type="number"], .light-mode textarea { background: var(--light-input-bg); color: var(--light-text); border: 1px solid rgba(0,0,0,0.08); }
+.light-mode .ai-solution, .light-mode .chat-output { background: rgba(0,0,0,0.03); color: var(--light-text); border: 1px solid rgba(0,0,0,0.06); }
+.light-mode .nav-btn { color: var(--light-text); }
+.light-mode .btn { color: var(--light-text); }
+
+/* small responsive tweak */
+@media (max-width:480px){
+  #generalAiPopup { right: 10px; left:10px; bottom: 110px; width: auto; }
+}
+/* 🌗 Light Mode Styling */
+body.light-mode {
+  background-color: #ffffff;
+  color: #222222;
+}
+
+/* Update all containers, cards, and text */
+body.light-mode .card,
+body.light-mode .section,
+body.light-mode .container {
+  background-color: #f8f9fa !important;
+  color: #111111 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+body.light-mode h1,
+body.light-mode h2,
+body.light-mode h3,
+body.light-mode label,
+body.light-mode p,
+body.light-mode span {
+  color: #111111 !important;
+}
+
+/* Inputs & sliders */
+body.light-mode input,
+body.light-mode select,
+body.light-mode textarea {
+  background-color: #ffffff !important;
+  color: #111111 !important;
+  border: 1px solid #cccccc;
+}
+
+/* Buttons */
+body.light-mode button {
+  background-color: #007bff !important;
+  color: white !important;
+}
+
+body.light-mode button:hover {
+  background-color: #0056b3 !important;
+}
+
+/* Navbar & footer */
+body.light-mode nav,
+body.light-mode footer {
+  background-color: #e9ecef !important;
+  color: #111111 !important;
+}
+
+/* Light Mode fix for links */
+body.light-mode a {
+  color: #007bff !important;
+}
+
+/* Chart canvas background */
+body.light-mode canvas {
+  background-color: #ffffff !important;
+}
+
+/* AI Chatbox light mode */
+body.light-mode #aiChatPopup {
+  background-color: #f9f9f9 !important;
+  color: #111 !important;
+}
+
+
+</style>
+</head>
+<body>
+
+<!-- 🌟 Navigation Bar -->
+<nav class="top-nav">
+  <button class="nav-btn" onclick="scrollToSection('Simulator')">⚙️ Simulator</button>
+  <button class="nav-btn" onclick="scrollToSection('ask-ai')">🌍 Ask AI</button>
+  <button class="nav-btn" onclick="scrollToSection('future')">🔮 Future Enhancements</button>
+</nav>
+
+<!-- ⚙️ Dashboard Section (unchanged content & logic) -->
+<section id="Simulator">
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <div style="display:flex;gap:12px;align-items:center;">
+      <div style="width:50px;height:50px;border-radius:8px;background:linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700;">OC</div>
+      <div>
+        <h1>OilClean Simulator AI</h1>
+        <p class="lead">Simulate magnetic oil-cleaning — get AI guidance and sensor data.</p>
+      </div>
+    </div>
+    <div class="muted" style="font-size:13px;color:#cfe8ff;">Built in HTML & JavaScript</div>
+  </div>
+
+  <div>
+    <label>Oil (liters)</label>
+    <input id="oil" type="number" min="0.1" step="0.1" value="5">
+
+    <label>Iron fillings (Kilo grams)</label>
+    <input id="iron" type="number" min="1" step="1" value="50">
+
+    <label>Magnet strength: <span id="magnetValue">6</span>/10</label>
+    <input id="magnet" type="range" min="1" max="10" step="1" value="6">
+
+    <label>Time (minutes)</label>
+    <input id="time" type="number" min="1" step="0.5" value="10">
+
+    <div style="margin-top:8px;">
+      <button class="btn" id="simulateBtn">Run Simulation</button>
+      <button class="btn" id="resetBtn" style="background:rgba(255,255,255,0.06);color:#cfe8ff;">Reset</button>
+    </div>
+
+    <div id="oilTank">
+      <div class="magnet">MAG</div>
+      <div class="oil-drop" style="left:20%; top:50%;"></div>
+      <div class="oil-drop" style="left:50%; top:65%;"></div>
+      <div class="oil-drop" style="left:75%; top:40%;"></div>
+    </div>
+
+    <div style="margin-top:10px;">
+      <div class="muted-small">Result</div>
+      <div id="resultSummary" style="margin-top:6px;color:#cfe8ff;">No simulation run yet.</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div style="font-weight:800;margin-bottom:8px;">📉 Oil Level Chart</div>
+  <canvas id="oilChart" style="width:100%; height:220px;"></canvas>
+</div>
+</section>
+
+<!-- 🌍 Ask AI Section (unchanged — stays environmental only) -->
+<section id="ask-ai">
+<div class="card">
+  <div style="font-weight:800;margin-bottom:8px;">🌍 Ask AI</div>
+  <textarea id="userProblem" rows="3" placeholder="Describe your environmental problem..."></textarea>
+  <div style="display:flex;gap:8px;margin-top:8px;">
+    <button class="btn" id="askAiBtn">Ask AI</button>
+    <button class="btn" id="clearAiBtn" style="background:rgba(255,255,255,0.06);color:#cfe8ff;">Clear</button>
+  </div>
+  <div id="aiAdvice" class="ai-solution"></div>
+</div>
+</section>
+
+<!-- 🔮 Future Enhancements Section (unchanged) -->
+<section id="future">
+<div class="card">
+ <div style="font-weight:800;margin-bottom:8px;">⚙️ Future Enhancements</div>
+  <ul style="color:#dff7ff;line-height:1.5;">
+    <li>Connect real IoT turbidity / conductivity sensors to auto-trigger the cleaner.</li>
+  </ul>
+  <div style="font-weight:800;margin-bottom:8px;">🔬 Sensor-Generated Water Purity</div>
+  <div id="purityDisplay" style="font-size:22px;font-weight:800;color:#effff7;">0%</div>
+</div>
+</section>
+
+<!-- bottom-right toggles: AI toggle (general) above theme toggle -->
+<button id="aiToggle" class="control-fab" title="Open AI Chat">🤖</button>
+<button id="themeToggle" class="control-fab" title="Toggle Light / Dark">🌓</button>
+
+<!-- general AI popup (general-purpose) -->
+<div id="generalAiPopup" aria-hidden="true">
+  <h4>General AI</h4>
+  <textarea id="generalAiInput" placeholder="Ask anything (general purpose)..."></textarea>
+  <div style="display:flex;gap:8px;margin-top:8px;">
+    <button id="generalAiSend" class="btn">Send</button>
+    <button id="generalAiClear" style="background:rgba(255,255,255,0.06);color:#cfe8ff;">Clear</button>
+    <button id="generalAiClose" style="background:transparent;color:#cfe8ff;border:none;font-size:18px;">✕</button>
+  </div>
+  <div id="generalAiOutput" class="chat-output" style="margin-top:8px;">No conversation yet.</div>
+</div>
+
+<script type="module">
+// Keep your existing JavaScript — unchanged logic & behavior
+import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers/dist/transformers.min.js';
+
+const magnetInput = document.getElementById('magnet');
+const magnetValue = document.getElementById('magnetValue');
+const oilTank = document.getElementById('oilTank');
+const simulateBtn = document.getElementById('simulateBtn');
+const resetBtn = document.getElementById('resetBtn');
+const resultSummary = document.getElementById('resultSummary');
+const drops = document.querySelectorAll('.oil-drop');
+
+magnetInput.addEventListener('input',()=>magnetValue.innerText=magnetInput.value);
+
+// Chart setup
+let oilChart = null;
+function initChart(){
+  const ctx=document.getElementById('oilChart').getContext('2d');
+  oilChart = new Chart(ctx,{
+    type:'line',
+    data:{labels:['0 min'],datasets:[{label:'Oil Level (L)',data:[5],fill:true,tension:0.3,borderWidth:2,borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,0.2)'}]},
+    options:{scales:{y:{beginAtZero:true,title:{display:true,text:'Liters'}},x:{title:{display:true,text:'Time (min)'}}},plugins:{legend:{display:false}}}
+  });
+}
+initChart();
+
+// -------------------- Practical Formula --------------------
+function simulateCleaning(oil, iron, magnet, time){
+    if(oil <= 0) return {efficiency:0, Co:0};
+    const oilNorm = oil / 10;
+    const ironNorm = iron / 100;
+    const magnetNorm = magnet / 10;
+    const timeNorm = time / 20;
+    let efficiency = (ironNorm * 0.4 + magnetNorm * 0.3 + timeNorm * 0.3) * (1 / (oilNorm + 0.1)) * 100;
+    efficiency = Math.min(100, Math.max(0, efficiency));
+    const Co = oil * (1 - efficiency/100);
+    return {efficiency: Math.round(efficiency*100)/100, Co};
+}
+function updateTank(oilLeftPercent){
+  const p = Math.max(0, Math.min(100, oilLeftPercent));
+  oilTank.style.background = `linear-gradient(to top, #ffdb4d ${p}%, #6ec7ff ${p}%)`;
+}
+function updateDrops(oilLeftPercent){
+  drops.forEach(drop=>{
+    const scale = Math.max(0.1, oilLeftPercent/100);
+    drop.style.transform = `scale(${scale})`;
+    drop.style.opacity = 0.3 + 0.7*scale;
+  });
+}
+
+// Run simulation (unchanged)
+simulateBtn.addEventListener('click',()=>{
+    const oil = parseFloat(document.getElementById('oil').value) || 0;
+    const iron = parseFloat(document.getElementById('iron').value) || 0;
+    const magnet = parseFloat(document.getElementById('magnet').value) || 0;
+    const time = parseFloat(document.getElementById('time').value) || 0;
+
+    const {efficiency, Co} = simulateCleaning(oil, iron, magnet, time);
+    const oilLeftPercent = (Co/oil)*100;
+
+    updateTank(oilLeftPercent);
+    updateDrops(oilLeftPercent);
+
+    // Smooth chart update
+    const steps = Math.max(2, Math.round(time));
+    const labels = [];
+    const data = [];
+    for(let i=0; i<=steps; i++){
+        labels.push(`${i} min`);
+        const fraction = i/steps;
+        const oilLeft = oil * (1 - (efficiency/100) * fraction);
+        data.push(Number(oilLeft.toFixed(2)));
+    }
+
+    oilChart.data.labels = labels;
+    oilChart.data.datasets[0].data = data;
+    oilChart.update();
+
+    resultSummary.innerHTML = `<strong style="color:${efficiency>60?'#b7ffcc':'#ffdca0'}">${efficiency}%</strong> oil cleaned. (Iron: ${iron}g, Magnet: ${magnet}/10, Time: ${time} min)`;
+
+    // update purity display in future section
+    const purityEl = document.getElementById('purityDisplay');
+    if (purityEl) purityEl.textContent = `${efficiency}%`;
+
+    // Magnet visual effects (unchanged concept)
+    const magnetEl = document.querySelector('.magnet');
+    if (magnetEl) {
+      if (magnet > 7) magnetEl.classList.add('glow');
+      else magnetEl.classList.remove('glow');
+    }
+});
+
+// Reset simulation (unchanged)
+resetBtn.addEventListener('click',()=>{
+  document.getElementById('oil').value = 5;
+  document.getElementById('iron').value = 50;
+  document.getElementById('magnet').value = 6;
+  document.getElementById('time').value = 10;
+  magnetValue.innerText='6';
+  updateTank(100);
+  updateDrops(100);
+  resultSummary.innerText='No simulation run yet.';
+  oilChart.data.labels=['0 min'];
+  oilChart.data.datasets[0].data=[5];
+  oilChart.update();
+
+  const purityEl = document.getElementById('purityDisplay');
+  if (purityEl) purityEl.textContent = '0%';
+
+  const magnetEl = document.querySelector('.magnet');
+  if (magnetEl) magnetEl.classList.remove('glow');
+});
+
+// ------------------- Offline AI (Ask AI section) — unchanged behavior -------------------
+const askAiBtn = document.getElementById('askAiBtn');
+const clearAiBtn = document.getElementById('clearAiBtn');
+const userProblem = document.getElementById('userProblem');
+const aiAdvice = document.getElementById('aiAdvice');
+let thinkingInterval = null;
+let generator = null;
+async function loadModel() {
+  aiAdvice.innerText = 'Loading AI model locally...';
+  generator = await pipeline('text-generation', 'model/'); // if you have local model assets
+  aiAdvice.innerText = '';
+}
+loadModel();
+
+askAiBtn.addEventListener('click', async () => {
+  const problem = userProblem.value.trim();
+  if (!problem) {
+    aiAdvice.innerText = 'Please enter a short description of your environmental problem.';
+    return;
+  }
+  let dots = 0;
+  aiAdvice.innerText = 'Thinking';
+  if (thinkingInterval) clearInterval(thinkingInterval);
+  thinkingInterval = setInterval(() => {
+    dots = (dots + 1) % 4;
+    aiAdvice.innerText = 'Thinking' + '.'.repeat(dots);
+  }, 500);
+
+  try {
+    const response = await fetch("http://localhost:3000/ask-ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ problem })
+    });
+
+    function formatAIResponse(text) {
+      return text
+        .replace(/### (.+)/g, '<h3>$1</h3>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br>');
+    }
+
+    const data = await response.json();
+    clearInterval(thinkingInterval);
+    aiAdvice.innerHTML = formatAIResponse(data.answer || "No response from AI.");
+  } catch (err) {
+    clearInterval(thinkingInterval);
+    aiAdvice.innerText = "Error connecting to AI server.";
+  }
+});
+
+clearAiBtn.addEventListener('click', () => {
+  userProblem.value = '';
+  aiAdvice.innerText = '';
+  if (thinkingInterval) clearInterval(thinkingInterval);
+});
+
+// ------------------- General-purpose AI popup (new) -------------------
+const aiToggle = document.getElementById('aiToggle');
+const generalPopup = document.getElementById('generalAiPopup');
+const generalInput = document.getElementById('generalAiInput');
+const generalSend = document.getElementById('generalAiSend');
+const generalClear = document.getElementById('generalAiClear');
+const generalClose = document.getElementById('generalAiClose');
+const generalOutput = document.getElementById('generalAiOutput');
+
+aiToggle.addEventListener('click', ()=>{
+  if (generalPopup.style.display === 'flex') {
+    generalPopup.style.display = 'none';
+    generalPopup.setAttribute('aria-hidden','true');
+  } else {
+    generalPopup.style.display = 'flex';
+    generalPopup.setAttribute('aria-hidden','false');
+    generalInput.focus();
+  }
+});
+
+generalClose.addEventListener('click', ()=>{
+  generalPopup.style.display = 'none';
+  generalPopup.setAttribute('aria-hidden','true');
+});
+
+generalClear.addEventListener('click', ()=>{
+  generalInput.value = '';
+  generalOutput.innerText = 'No conversation yet.';
+});
+
+// send to /ask-general-ai (general-purpose; not environmental-specific)
+generalSend.addEventListener('click', async ()=>{
+  const q = generalInput.value.trim();
+  if (!q) return;
+  generalOutput.innerText = 'Thinking...';
+  try {
+    const resp = await fetch('http://localhost:3000/ask-general-ai', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ prompt: q })
+    });
+    const data = await resp.json();
+    generalOutput.innerText = data.answer || 'No response.';
+  } catch (e) {
+    generalOutput.innerText = 'Error connecting to server.';
+  }
+});
+
+// ------------------- Active nav highlight -------------------
+const sections = document.querySelectorAll('section');
+const navBtns = document.querySelectorAll('.nav-btn');
+window.addEventListener('scroll', ()=>{
+  let current = '';
+  sections.forEach(sec=>{
+    const top = window.scrollY;
+    const offset = sec.offsetTop - 120;
+    const height = sec.offsetHeight;
+    if (top >= offset && top < offset + height) current = sec.id;
+  });
+  navBtns.forEach(btn=>{
+    btn.classList.remove('active');
+    if (btn.getAttribute('onclick') && current && btn.getAttribute('onclick').includes(current)) btn.classList.add('active');
+  });
+});
+
+// ------------------- Theme toggle (fixed visibility) -------------------
+const themeToggle = document.getElementById("themeToggle");
+themeToggle.addEventListener("click", () => {
+  document.body.classList.toggle("light-mode");
+
+  // Save user preference
+  if (document.body.classList.contains("light-mode")) {
+    localStorage.setItem("theme", "light");
+  } else {
+    localStorage.setItem("theme", "dark");
+  }
+});
+
+// Load saved preference
+window.addEventListener("load", () => {
+  if (localStorage.getItem("theme") === "light") {
+    document.body.classList.add("light-mode");
+  }
+});
+
+
+/* Scroll helper */
+window.scrollToSection = function(id){
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+
+<!-- Footer -->
+<footer style="text-align:center; padding:12px 0; margin-top:20px; color:#cfe8ff; font-size:14px; border-top:1px solid rgba(255,255,255,0.1);">
+   by <strong>Chiranth Reddy P.</strong>
+</footer>
+</body>
+</html>
