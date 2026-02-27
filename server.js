@@ -9,7 +9,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Paste your Gemini API key here (local only)
-const GEMINI_API_KEY = "AIzaSyDNHTfBv42UlOgdVf6AwzZfNz7ldqKsgm8";
+const GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 /**
@@ -80,3 +80,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🌍 Server running with Gemini API at http://localhost:${PORT}`);
 });
+
